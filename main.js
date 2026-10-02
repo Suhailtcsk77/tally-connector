@@ -1604,6 +1604,14 @@ const salesLedger = salesLedgers.includes(
   ? String(setupData.salesLedger).trim()
   : salesLedgers[0] || '';
 
+const splitSalesLedgerByTaxRate =
+  setupData.splitSalesLedgerByTaxRate === true;
+
+const salesLedgerMappings =
+  Array.isArray(setupData.salesLedgerMappings)
+    ? setupData.salesLedgerMappings
+    : [];
+
   const salesVoucherTypes = Array.isArray(
   setupData.salesVoucherTypes
 )
@@ -1810,7 +1818,10 @@ const salesVoucherType = salesVoucherTypes.includes(
 .replace(
   /^SALES_VOUCHER_TYPES=.*$/gm,
   ''
-);
+)
+.replace(/^SPLIT_SALES_LEDGER_BY_TAX_RATE=.*$/gm, '')
+.replace(/^SALES_LEDGER_TAX_RATE_MAPPINGS=.*$/gm, '')
+;
 
 
       // =================================
@@ -1861,6 +1872,9 @@ PRICE_LEVEL_SPECIAL=${specialPriceLevel}
 CGST_LEDGERS=${cgstLedgersJson}
 SGST_LEDGERS=${sgstLedgersJson}
 IGST_LEDGERS=${igstLedgersJson}
+
+SPLIT_SALES_LEDGER_BY_TAX_RATE=${splitSalesLedgerByTaxRate}
+SALES_LEDGER_TAX_RATE_MAPPINGS=${JSON.stringify(salesLedgerMappings)}
 
 
 COMMON_CGST_LEDGERS=${JSON.stringify(commonCgstLedgers)}
@@ -2915,6 +2929,167 @@ function switchSalesVoucherType(voucherTypeName) {
   updateMenu();
 }
 
+
+function getSplitLedgerEnabled() {
+  try {
+    const envPath = getEnvPath();
+
+    if (!fs.existsSync(envPath)) {
+      return false;
+    }
+
+    const envContent = fs.readFileSync(envPath, 'utf8');
+
+    const match = envContent.match(
+      /^SPLIT_SALES_LEDGER_BY_TAX_RATE\s*=\s*(true|false)\s*$/im
+    );
+
+    return match
+      ? match[1].toLowerCase() === 'true'
+      : false;
+  } catch (error) {
+    console.error(
+      '[SPLIT LEDGER] Could not read setting:',
+      error.message
+    );
+
+    return false;
+  }
+}
+
+function switchSplitLedger() {
+  const envPath = getEnvPath();
+
+  try {
+    let envContent = fs.existsSync(envPath)
+      ? fs.readFileSync(envPath, 'utf8')
+      : '';
+
+    const nextEnabled = !getSplitLedgerEnabled();
+
+    const settingLine =
+      `SPLIT_SALES_LEDGER_BY_TAX_RATE=${nextEnabled}`;
+
+    if (/^SPLIT_SALES_LEDGER_BY_TAX_RATE\s*=.*$/im.test(envContent)) {
+      envContent = envContent.replace(
+        /^SPLIT_SALES_LEDGER_BY_TAX_RATE\s*=.*$/im,
+        settingLine
+      );
+    } else {
+      envContent +=
+        `${envContent && !envContent.endsWith('\n') ? '\n' : ''}` +
+        `${settingLine}\n`;
+    }
+
+    fs.writeFileSync(envPath, envContent, 'utf8');
+
+    console.log(
+      `[SPLIT LEDGER] Setting changed to ${nextEnabled ? 'ON' : 'OFF'}`
+    );
+
+    updateMenu();
+
+    if (bridgeProcess) {
+      const processToRestart = bridgeProcess;
+
+      processToRestart.once('exit', () => {
+        if (bridgeProcess === processToRestart) {
+          bridgeProcess = null;
+          startBridge();
+        }
+      });
+
+      processToRestart.kill();
+    }
+  } catch (error) {
+    console.error(
+      '[SPLIT LEDGER] Could not change setting:',
+      error.message
+    );
+  }
+}
+
+
+function getRoundOffEnabled() {
+  try {
+    const envPath = getEnvPath();
+
+    if (!fs.existsSync(envPath)) {
+      return true; // Keep current round-up behavior by default
+    }
+
+    const envContent = fs.readFileSync(envPath, 'utf8');
+
+    const match = envContent.match(
+      /^ROUND_OFF_ENABLED\s*=\s*(true|false)\s*$/im
+    );
+
+    return match
+      ? match[1].toLowerCase() === 'true'
+      : true;
+  } catch (error) {
+    console.error(
+      '[ROUND OFF] Could not read setting:',
+      error.message
+    );
+
+    return true;
+  }
+}
+
+function switchRoundOff() {
+  const envPath = getEnvPath();
+
+  try {
+    let envContent = fs.existsSync(envPath)
+      ? fs.readFileSync(envPath, 'utf8')
+      : '';
+
+    const nextEnabled = !getRoundOffEnabled();
+
+    const settingLine = `ROUND_OFF_ENABLED=${nextEnabled}`;
+
+    if (/^ROUND_OFF_ENABLED\s*=.*$/im.test(envContent)) {
+      envContent = envContent.replace(
+        /^ROUND_OFF_ENABLED\s*=.*$/im,
+        settingLine
+      );
+    } else {
+      envContent +=
+        `${envContent && !envContent.endsWith('\n') ? '\n' : ''}` +
+        `${settingLine}\n`;
+    }
+
+    fs.writeFileSync(envPath, envContent, 'utf8');
+
+    console.log(
+      `[ROUND OFF] Setting changed to ${nextEnabled ? 'ON' : 'OFF'}`
+    );
+
+    updateMenu();
+
+    if (bridgeProcess) {
+      const processToRestart = bridgeProcess;
+
+      processToRestart.once('exit', () => {
+        if (bridgeProcess === processToRestart) {
+          bridgeProcess = null;
+          startBridge();
+        }
+      });
+
+      processToRestart.kill();
+    }
+  } catch (error) {
+    console.error(
+      '[ROUND OFF] Could not change setting:',
+      error.message
+    );
+  }
+}
+
+
+
 // =================================
 // UPDATE TRAY MENU
 // =================================
@@ -3262,6 +3437,30 @@ function updateMenu() {
       },
 
 
+
+{
+  label: getSplitLedgerEnabled()
+    ? 'Split Ledger: ON'
+    : 'Split Ledger: OFF',
+
+  enabled: isActivated() && isTallySetupComplete(),
+
+  click: switchSplitLedger
+},
+
+{
+  label: getRoundOffEnabled()
+    ? 'Round Off: ON'
+    : 'Round Off: OFF',
+
+  enabled: isActivated() && isTallySetupComplete(),
+
+  click: switchRoundOff
+},
+
+{
+  type: 'separator'
+},
 
 
 {

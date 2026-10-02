@@ -275,6 +275,50 @@ const sgstLedgers =
     process.env.SGST_LEDGERS
   );
 
+// =================================
+// SPLIT SALES LEDGER BY TAX RATE
+// =================================
+
+const splitSalesLedgerByTaxRate =
+  String(
+    process.env.SPLIT_SALES_LEDGER_BY_TAX_RATE || 'false'
+  ).trim().toLowerCase() === 'true';
+
+// =================================
+// ROUND OFF ON/OFF SETTING
+// =================================
+
+const roundOffEnabled =
+  String(
+    process.env.ROUND_OFF_ENABLED ?? 'true'
+  ).trim().toLowerCase() === 'true';
+
+let salesLedgerTaxRateMappings = [];
+
+try {
+  salesLedgerTaxRateMappings = JSON.parse(
+    process.env.SALES_LEDGER_TAX_RATE_MAPPINGS || '[]'
+  );
+
+  if (!Array.isArray(salesLedgerTaxRateMappings)) {
+    salesLedgerTaxRateMappings = [];
+  }
+} catch (error) {
+  console.error(
+    'Invalid sales ledger tax rate mappings:',
+    error.message
+  );
+  salesLedgerTaxRateMappings = [];
+}
+
+const salesLedgerByTaxRate = new Map(
+  salesLedgerTaxRateMappings.map(item => [
+    Number(item.rate),
+    String(item.ledgerName || '').trim()
+  ])
+);
+
+
 
 const igstLedgers =
   parseLedgerConfig(
@@ -376,6 +420,16 @@ console.log(
 console.log(
   'SGST Ledgers:',
   sgstLedgers
+);
+
+console.log(
+  'Split Sales Ledger By Tax Rate:',
+  splitSalesLedgerByTaxRate
+);
+
+console.log(
+  'Sales Ledger Tax Rate Mappings:',
+  salesLedgerTaxRateMappings
 );
 
 console.log(
@@ -6775,7 +6829,8 @@ function parseTallyProductGSTRates(
     // =================================
 
     async function generateInvoiceInTally(
-  invoiceData
+  invoiceData,
+  options = {}
 ) {
 
   try {
@@ -6904,7 +6959,8 @@ function parseTallyProductGSTRates(
       // =================================
 
       const salesLedger =
-        await getSalesLedger();
+  options.forcedSalesLedger ||
+  await getSalesLedger();
 
 
       if (
@@ -6969,7 +7025,98 @@ const preparedItems =
     productGSTRates,
     gstEnabled
   );
+// =================================
+// SPLIT VOUCHERS BY GST RATE
+// =================================
 
+if (
+  splitSalesLedgerByTaxRate &&
+  !options.skipSplitByTaxRate
+) {
+  const groups = new Map();
+
+  // Validate mappings and group original line items
+  // using GST rates obtained from Tally.
+  preparedItems.forEach((item, index) => {
+    const rate = Number(item.gstRate || 0);
+    const ledgerName = salesLedgerByTaxRate.get(rate);
+
+    if (!ledgerName) {
+      throw new Error(
+        `No sales ledger configured for GST rate ${rate}% ` +
+        `on product "${item.productName}". ` +
+        'Check SALES_LEDGER_TAX_RATE_MAPPINGS.'
+      );
+    }
+
+    if (!groups.has(rate)) {
+      groups.set(rate, {
+        ledgerName,
+        lineItems: []
+      });
+    }
+
+    groups.get(rate).lineItems.push(lineItems[index]);
+  });
+
+  const voucherResults = [];
+
+  // Create one voucher for each distinct GST rate.
+  for (const [rate, group] of groups) {
+    console.log(
+      `[BRIDGE] Creating separate voucher for GST rate ${rate}%`,
+      '| Sales ledger:',
+      group.ledgerName,
+      '| Items:',
+      group.lineItems.length
+    );
+
+    const result = await generateInvoiceInTally(
+      {
+        ...invoiceData,
+        line_items: group.lineItems
+      },
+      {
+        skipSplitByTaxRate: true,
+        forcedSalesLedger: group.ledgerName
+      }
+    );
+
+    voucherResults.push({
+      gstRate: rate,
+      ledgerName: group.ledgerName,
+      result
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error:
+          `Voucher creation failed for GST rate ${rate}%. ` +
+          result.error,
+        voucherResults
+      };
+    }
+  }
+
+  return {
+    success: true,
+    order_id: order.id,
+    order_number: order.order_number,
+    created: voucherResults.reduce(
+      (total, entry) =>
+        total + Number(entry.result.created || 0),
+      0
+    ),
+    altered: voucherResults.reduce(
+      (total, entry) =>
+        total + Number(entry.result.altered || 0),
+      0
+    ),
+    splitByGstRate: true,
+    voucherResults
+  };
+}
 
 // =================================
 // CALCULATE TOTALS
@@ -7028,7 +7175,9 @@ const calculatedVoucherTotal =
 // ROUND UP TO THE NEXT WHOLE RUPEE
 // =================================
 
-const roundedTotal = Math.ceil(calculatedVoucherTotal);
+const roundedTotal = roundOffEnabled
+  ? Math.ceil(calculatedVoucherTotal)
+  : calculatedVoucherTotal;
 
 console.log(
   '[BRIDGE] Actual Voucher Total:',
@@ -7045,13 +7194,11 @@ console.log(
 // ROUND OFF
 // =================================
 
-const roundOffAmount =
-  Number(
-    (
-      roundedTotal -
-      calculatedVoucherTotal
-    ).toFixed(2)
-  );
+const roundOffAmount = roundOffEnabled
+  ? Number(
+      (roundedTotal - calculatedVoucherTotal).toFixed(2)
+    )
+  : 0;
 
 
 // =================================

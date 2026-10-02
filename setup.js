@@ -1,6 +1,9 @@
 const salesLedgersInput =
   document.getElementById('salesLedgers');
 
+const splitSalesLedgerByTaxRateInput =
+  document.getElementById('splitSalesLedgerByTaxRate');
+
 const salesVoucherTypesInput =
   document.getElementById('salesVoucherTypes');
 
@@ -328,16 +331,67 @@ async function saveSetup() {
   const companyName =
     companyNameInput.value.trim();
 
-  const salesLedgers = [
-  ...new Set(
-    salesLedgersInput.value
-      .split(/\r?\n/)
-      .map(name => name.trim())
-      .filter(Boolean)
-  )
-];
+  const splitSalesLedgerByTaxRate =
+  splitSalesLedgerByTaxRateInput.checked;
+
+const salesLedgerInputLines =
+  salesLedgersInput.value
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+
+let salesLedgerMappings = [];
+let salesLedgers = [];
+
+if (splitSalesLedgerByTaxRate) {
+  salesLedgerMappings = salesLedgerInputLines.map(line => {
+    const separator = line.indexOf('-');
+
+    if (separator < 1) {
+      throw new Error(
+        `Invalid sales ledger format: ${line}. ` +
+        'Use RATE-LEDGER NAME, for example 12-GST SALES @ 12%.'
+      );
+    }
+
+    const rateText = line.slice(0, separator).trim();
+    const ledgerName = line.slice(separator + 1).trim();
+    const rate = Number(rateText);
+
+    if (
+      !/^\d+(?:\.\d+)?$/.test(rateText) ||
+      !Number.isFinite(rate) ||
+      rate < 0 ||
+      !ledgerName
+    ) {
+      throw new Error(
+        `Invalid sales ledger mapping: ${line}`
+      );
+    }
+
+    return { rate, ledgerName };
+  });
+
+  const rates = salesLedgerMappings.map(item => item.rate);
+
+  if (new Set(rates).size !== rates.length) {
+    throw new Error(
+      'Each GST rate must have only one sales ledger.'
+    );
+  }
+
+  salesLedgers = salesLedgerMappings.map(
+    item => item.ledgerName
+  );
+} else {
+  salesLedgers = [
+    ...new Set(salesLedgerInputLines)
+  ];
+}
 
 const salesLedger = salesLedgers[0] || '';
+
+
 
   const salesVoucherTypes = [
   ...new Set(
@@ -482,7 +536,10 @@ specialPriceLevel:
   document.getElementById('specialPriceLevel').value.trim(),
 
     salesLedgers,
-    salesLedger,
+salesLedger,
+
+splitSalesLedgerByTaxRate,
+salesLedgerMappings,
 
     salesVoucherTypes,
     salesVoucherType,

@@ -639,6 +639,22 @@ textarea:focus {
 <div class="field-group">
   <label for="salesLedgers">Sales Ledgers</label>
 
+  <div class="field-group">
+  <label>
+    <input
+      type="checkbox"
+      id="splitSalesLedgerByTaxRate"
+    >
+    Splitted Sales Ledger with Tax Rate
+  </label>
+
+  <p class="help-text">
+    Enable this option to map each GST rate to its
+    sales ledger using RATE-LEDGER NAME format.
+    Example: 12-GST SALES @ 12%
+  </p>
+</div>
+
   <textarea
     id="salesLedgers"
     rows="4"
