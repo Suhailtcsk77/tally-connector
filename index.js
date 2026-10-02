@@ -5980,7 +5980,7 @@ function buildGSTLedgerEntries(
     // GET GST RATES FROM TALLY PRODUCTS
     // =================================
 
-    async function getTallyProductGSTRates() {
+    async function getTallyProductGSTRates(voucherDate){
 
       console.log('');
 
@@ -6052,6 +6052,9 @@ function buildGSTLedgerEntries(
             <FETCH>
               Name
             </FETCH>
+
+            <FETCH>Parent</FETCH>
+            <FETCH>SRCOFGSTDETAILS</FETCH>
 
 
             <FETCH>
@@ -6148,359 +6151,243 @@ function buildGSTLedgerEntries(
       );
 
 
-      return parseTallyProductGSTRates(
-        responseXml
-      );
+   let stockGroupGstRates = new Map();
 
-    }
+try {
+  stockGroupGstRates =
+    await getProductSyncStockGroupGstRates();
+
+  console.log(
+    '[GST] Stock Group rates:',
+    [...stockGroupGstRates.entries()]
+  );
+} catch (error) {
+  console.error(
+    '[GST] Could not fetch Stock Group GST rates:',
+    error.message
+  );
+}
+
+return parseTallyProductGSTRates(
+  responseXml,
+  stockGroupGstRates,
+  voucherDate
+);
+
+}
+
+    
 
     // =================================
     // PARSE TALLY PRODUCT GST RATES
     // =================================
+function parseTallyProductGSTRates(
+  xml,
+  stockGroupGstRates = new Map(),
+  voucherDate
+) {
+  const productRates = {};
 
-    function parseTallyProductGSTRates(
-      xml
+  if (!xml) {
+    return productRates;
+  }
+
+  const invoiceDateKey =
+    getTallyDateKey(voucherDate) ||
+    String(voucherDate || '').replace(/\D/g, '');
+
+  const stockItemRegex =
+    /<STOCKITEM\b[^>]*>[\s\S]*?<\/STOCKITEM>/gi;
+
+  let stockMatch;
+
+  while ((stockMatch = stockItemRegex.exec(xml)) !== null) {
+    const stockItemXml = stockMatch[0];
+
+    const nameMatch = stockItemXml.match(
+      /<STOCKITEM\b[^>]*\bNAME="([^"]*)"/i
+    );
+
+    const productName = decodeXml(
+      nameMatch
+        ? nameMatch[1]
+        : getTagValue(stockItemXml, 'NAME') || ''
+    ).trim();
+
+    if (!productName) {
+      continue;
+    }
+
+    const parentGroupName = decodeXml(
+      getTagValue(stockItemXml, 'PARENT') || ''
+    ).trim();
+
+    const gstDetailsRegex =
+      /<GSTDETAILS\.LIST\b[^>]*>[\s\S]*?<\/GSTDETAILS\.LIST>/gi;
+
+    let detailsMatch;
+    let selectedDetails = null;
+    let selectedDateKey = '';
+
+    while (
+      (detailsMatch = gstDetailsRegex.exec(stockItemXml)) !== null
     ) {
+      const detailsXml = detailsMatch[0];
 
-      const productRates =
-        {};
+      const applicableDate = getTagValue(
+        detailsXml,
+        'APPLICABLEFROM'
+      );
 
+      const dateKey =
+        getTallyDateKey(applicableDate) || '00000000';
+
+      // Ignore GST settings that begin after the invoice date.
+      if (invoiceDateKey && dateKey > invoiceDateKey) {
+        continue;
+      }
+
+      // Select the latest GST setting applicable on the invoice date.
+      if (
+        selectedDetails === null ||
+        dateKey >= selectedDateKey
+      ) {
+        selectedDetails = detailsXml;
+        selectedDateKey = dateKey;
+      }
+    }
+
+    if (!selectedDetails) {
+      console.warn(
+        '[GST] No applicable GST details:',
+        productName,
+        '| Invoice date:',
+        invoiceDateKey
+      );
+
+      productRates[normalizeName(productName)] = 0;
+      continue;
+    }
+
+    // Read the GST source from the selected effective-date block only.
+    const gstSource = String(
+      getTagValue(selectedDetails, 'SRCOFGSTDETAILS') || ''
+    ).trim().toLowerCase();
+
+    let cgstRate = null;
+    let sgstRate = null;
+    let igstRate = null;
+
+    const rateDetailRegex =
+      /<RATEDETAILS\.LIST\b[^>]*>[\s\S]*?<\/RATEDETAILS\.LIST>/gi;
+
+    let rateMatch;
+
+    while (
+      (rateMatch = rateDetailRegex.exec(selectedDetails)) !== null
+    ) {
+      const rateXml = rateMatch[0];
+
+      const dutyHead = String(
+        getTagValue(rateXml, 'GSTRATEDUTYHEAD') || ''
+      ).trim().toLowerCase();
+
+      const rateText = getTagValue(rateXml, 'GSTRATE');
+
+      if (rateText === null || String(rateText).trim() === '') {
+        continue;
+      }
+
+      const numberMatch = String(rateText)
+        .replace(/,/g, '')
+        .match(/-?\d+(?:\.\d+)?/);
+
+      if (!numberMatch) {
+        continue;
+      }
+
+      const rate = Number(numberMatch[0]);
+
+      if (!Number.isFinite(rate)) {
+        continue;
+      }
 
       if (
-        !xml
+        dutyHead.includes('igst') ||
+        dutyHead.includes('integrated')
       ) {
-
-        return productRates;
-
-      }
-
-
-      // =================================
-      // FIND STOCK ITEMS
-      // =================================
-
-      const stockItemRegex =
-        /<STOCKITEM\b[^>]*>[\s\S]*?<\/STOCKITEM>/gi;
-
-
-      let stockMatch;
-
-
-      while (
-
-        (
-          stockMatch =
-          stockItemRegex.exec(
-            xml
-          )
-        )
-        !== null
-
+        igstRate = rate;
+      } else if (
+        dutyHead.includes('cgst') ||
+        dutyHead.includes('central')
       ) {
-
-
-        const stockItemXml =
-          stockMatch[0];
-
-
-        // =================================
-        // GET PRODUCT NAME
-        // =================================
-
-        const nameMatch =
-          stockItemXml.match(
-            /<STOCKITEM\b[^>]*\bNAME="([^"]*)"/i
-          );
-
-
-        let productName =
-          nameMatch
-            ? nameMatch[1]
-            : '';
-
-
-        if (
-          !productName
-        ) {
-
-          productName =
-            getTagValue(
-              stockItemXml,
-              'NAME'
-            );
-
-        }
-
-
-        if (
-          !productName
-        ) {
-
-          continue;
-
-        }
-
-
-        // =================================
-        // GST RATES
-        // =================================
-
-        let igstRate =
-          0;
-
-
-        let cgstRate =
-          0;
-
-
-        let sgstRate =
-          0;
-
-
-        // =================================
-        // IMPORTANT:
-        // TALLY RETURNS RATEDETAILS.LIST
-        // =================================
-
-        const rateDetailRegex =
-          /<RATEDETAILS\.LIST\b[^>]*>[\s\S]*?<\/RATEDETAILS\.LIST>/gi;
-
-
-        let rateMatch;
-
-
-        while (
-
-          (
-            rateMatch =
-            rateDetailRegex.exec(
-              stockItemXml
-            )
-          )
-          !== null
-
-        ) {
-
-
-          const rateXml =
-            rateMatch[0];
-
-
-          const dutyHead =
-            String(
-
-              getTagValue(
-                rateXml,
-                'GSTRATEDUTYHEAD'
-              )
-
-              ||
-
-              ''
-
-            )
-
-              .trim()
-
-              .toLowerCase();
-
-
-          const rateText =
-            getTagValue(
-              rateXml,
-              'GSTRATE'
-            );
-
-
-          const rate =
-            Number(
-              String(
-                rateText ||
-                '0'
-              ).trim()
-            );
-
-
-          if (
-
-            !Number.isFinite(
-              rate
-            )
-
-          ) {
-
-            continue;
-
-          }
-
-
-          // =================================
-          // CGST
-          // =================================
-
-          if (
-
-            dutyHead.includes(
-              'cgst'
-            )
-
-            ||
-
-            dutyHead.includes(
-              'central'
-            )
-
-          ) {
-
-            cgstRate =
-              rate;
-
-          }
-
-
-          // =================================
-          // SGST
-          // =================================
-
-          else if (
-
-            dutyHead.includes(
-              'sgst'
-            )
-
-            ||
-
-            dutyHead.includes(
-              'state'
-            )
-
-            ||
-
-            dutyHead.includes(
-              'utgst'
-            )
-
-          ) {
-
-            sgstRate =
-              rate;
-
-          }
-
-
-          // =================================
-          // IGST
-          // =================================
-
-          else if (
-
-            dutyHead.includes(
-              'igst'
-            )
-
-            ||
-
-            dutyHead.includes(
-              'integrated'
-            )
-
-          ) {
-
-            igstRate =
-              rate;
-
-          }
-
-        }
-
-
-        // =================================
-        // CALCULATE TOTAL GST
-        // =================================
-
-        let totalGSTRate =
-          0;
-
-
-        if (
-
-          igstRate > 0
-
-        ) {
-
-          totalGSTRate =
-            igstRate;
-
-        }
-
-        else {
-
-          totalGSTRate =
-            cgstRate +
-            sgstRate;
-
-        }
-
-
-        // =================================
-        // SAVE RATE
-        // =================================
-
-        productRates[
-
-          String(
-            productName
-          )
-
-            .trim()
-
-            .toLowerCase()
-
-        ] =
-
-          totalGSTRate;
-
-
-        console.log(
-          'GST RATE FOUND:'
-        );
-
-
-        console.log(
-          'Product:',
-          productName
-        );
-
-
-        console.log(
-          'CGST:',
-          cgstRate + '%'
-        );
-
-
-        console.log(
-          'SGST:',
-          sgstRate + '%'
-        );
-
-
-        console.log(
-          'IGST:',
-          igstRate + '%'
-        );
-
-
-        console.log(
-          'Total GST:',
-          totalGSTRate + '%'
-        );
-
+        cgstRate = rate;
+      } else if (
+        dutyHead.includes('sgst') ||
+        dutyHead.includes('state') ||
+        dutyHead.includes('utgst')
+      ) {
+        sgstRate = rate;
       }
-
-
-      return productRates;
-
     }
+
+    let totalGSTRate = 0;
+
+    if (igstRate !== null && igstRate > 0) {
+      totalGSTRate = igstRate;
+    } else if (cgstRate !== null || sgstRate !== null) {
+      totalGSTRate =
+        (cgstRate ?? 0) +
+        (sgstRate ?? 0);
+    }
+
+    const inheritsGroupRate =
+      gstSource.includes('as per company') &&
+      gstSource.includes('stock group');
+
+    // Use the Stock Group rate only when the selected setting inherits it.
+    if (totalGSTRate <= 0 && inheritsGroupRate) {
+      const inheritedRate =
+        resolveProductSyncStockGroupGstRate(
+          parentGroupName,
+          stockGroupGstRates
+        );
+
+      if (
+        inheritedRate !== null &&
+        Number(inheritedRate) > 0
+      ) {
+        totalGSTRate = Number(inheritedRate);
+      }
+
+      console.log(
+        '[GST] Inherited rate:',
+        productName,
+        '| Effective date:',
+        selectedDateKey,
+        '| Stock Group:',
+        parentGroupName,
+        '| Rate:',
+        totalGSTRate
+      );
+    }
+
+    productRates[normalizeName(productName)] = totalGSTRate;
+
+    console.log(
+      '[GST] Selected rate:',
+      productName,
+      '| Effective date:',
+      selectedDateKey,
+      '| Source:',
+      gstSource,
+      '| Total GST:',
+      totalGSTRate + '%'
+    );
+  }
+
+  return productRates;
+}
 
     // =================================
     // REMOVE GST FROM INCLUSIVE AMOUNT
@@ -6917,6 +6804,8 @@ function buildGSTLedgerEntries(
       const lineItems =
         invoiceData.line_items;
 
+      const voucherDate = getInvoiceDate();
+
       // =================================
       // GET GST STATUS
       // =================================
@@ -6942,7 +6831,7 @@ function buildGSTLedgerEntries(
       ) {
 
         productGSTRates =
-          await getTallyProductGSTRates();
+          await getTallyProductGSTRates(voucherDate);
 
       }
 
@@ -7048,8 +6937,7 @@ if (!salesVoucherType) {
       // GET VOUCHER DATE
       // =================================
 
-       const voucherDate =
-       getInvoiceDate();
+    
 
      // const voucherDate =
      //   '20260902';
@@ -7069,8 +6957,7 @@ if (!salesVoucherType) {
         calculateInvoiceTotal(
           lineItems
         );
-      const roundedTotal =
-        Math.round(totalAmount);
+      
 
       // =================================
 // PREPARE ITEMS FOR TALLY
@@ -7136,6 +7023,22 @@ const calculatedVoucherTotal =
       sgstTotal
     ).toFixed(2)
   );
+
+// =================================
+// ROUND UP TO THE NEXT WHOLE RUPEE
+// =================================
+
+const roundedTotal = Math.ceil(calculatedVoucherTotal);
+
+console.log(
+  '[BRIDGE] Actual Voucher Total:',
+  calculatedVoucherTotal
+);
+
+console.log(
+  '[BRIDGE] Final Rounded Total:',
+  roundedTotal
+);
 
 
 // =================================
