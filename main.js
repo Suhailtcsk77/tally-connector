@@ -1244,12 +1244,7 @@ ipcMain.handle(
     const fallbackArea =
   String(previewData.defaultCustomerArea || '').trim() || 'Shop';
 
-  const beat =
-  !parentGroup ||
-  /^sundry debtors$/i.test(parentGroup) ||
-  /^(not applicable|not set|none|nil|default|not defined|not available)$/i.test(parentGroup)
-    ? fallbackArea
-    : parentGroup;
+ 
 
       const xml = `
 <ENVELOPE>
@@ -2287,15 +2282,7 @@ if (line.includes('REALTIME LISTENER IS READY')) {
     requestProductSync();
   }
 }
- {
-  syncProductsAfterSetup = false;
 
-  console.log(
-    '[BRIDGE] Running initial product sync after setup.'
-  );
-
-  requestProductSync();
-}
 
 const customerPrefix = 'CUSTOMER_SYNC_RESULT:';
 
