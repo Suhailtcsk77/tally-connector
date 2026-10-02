@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <title>Tally Bridge Setup</title>
+
+
+  <style>
+
+    * {
+
+      box-sizing:
+        border-box;
+
+    }
+
+
+    body {
+
+      margin:
+        0;
+
+      padding:
+        30px;
+
+      font-family:
+        Arial,
+        sans-serif;
+
+      background:
+        #f4f6f8;
+
+      color:
+        #333;
+
+    }
+
+
+    .container {
+
+      max-width:
+        800px;
+
+      margin:
+        auto;
+
+      background:
+        white;
+
+      padding:
+        30px;
+
+      border-radius:
+        12px;
+
+      box-shadow:
+        0 5px 20px
+        rgba(
+          0,
+          0,
+          0,
+          0.12
+        );
+
+    }
+
+
+    h2 {
+
+      margin-top:
+        0;
+
+      text-align:
+        center;
+
+      color:
+        #2c3e50;
+
+      font-size:
+        26px;
+
+    }
+
+
+    .subtitle {
+
+      text-align:
+        center;
+
+      color:
+        #777;
+
+      margin-bottom:
+        30px;
+
+    }
+
+
+    h3 {
+
+      margin-top:
+        30px;
+
+      color:
+        #2c3e50;
+
+      border-bottom:
+        2px solid
+        #eee;
+
+      padding-bottom:
+        10px;
+
+    }
+
+
+    .field-group {
+
+      margin-bottom:
+        20px;
+
+    }
+
+
+    label {
+
+      display:
+        block;
+
+      font-weight:
+        bold;
+
+      margin-bottom:
+        8px;
+
+      color:
+        #444;
+
+    }
+
+
+    input,
+select,
+textarea {
+
+      width:
+        100%;
+
+      padding:
+        12px;
+
+      border:
+        1px solid
+        #ddd;
+
+      border-radius:
+        6px;
+
+      font-size:
+        14px;
+
+      outline:
+        none;
+
+    }
+
+    
+
+
+    input:focus,
+select:focus,
+textarea:focus {
+
+      border-color:
+        #4a90e2;
+
+      box-shadow:
+        0 0 0 3px
+        rgba(
+          74,
+          144,
+          226,
+          0.1
+        );
+
+    }
+
+    
+.sync-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  font-weight: normal;
+  cursor: pointer;
+}
+
+.sync-option input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+
+
+    .ledger-row {
+
+      display:
+        flex;
+
+      gap:
+        10px;
+
+      margin-bottom:
+        10px;
+
+      align-items:
+        center;
+
+    }
+
+
+    .ledger-row
+    input:first-child {
+
+      width:
+        120px;
+
+    }
+
+
+    .ledger-row
+    input:nth-child(2) {
+
+      flex:
+        1;
+
+    }
+
+
+    button {
+
+      border:
+        none;
+
+      border-radius:
+        6px;
+
+      padding:
+        11px 16px;
+
+      font-size:
+        14px;
+
+      cursor:
+        pointer;
+
+      transition:
+        0.2s;
+
+    }
+
+
+    .add-button {
+
+      background:
+        #eaf2ff;
+
+      color:
+        #2878d4;
+
+      font-weight:
+        bold;
+
+    }
+
+
+    .add-button:hover {
+
+      background:
+        #d9eaff;
+
+    }
+
+
+    .remove-ledger {
+
+      background:
+        #ffe5e5;
+
+      color:
+        #d63031;
+
+      white-space:
+        nowrap;
+
+    }
+
+
+    .remove-ledger:hover {
+
+      background:
+        #ffcfcf;
+
+    }
+
+
+    .section {
+
+      background:
+        #fafafa;
+
+      border:
+        1px solid
+        #eee;
+
+      padding:
+        20px;
+
+      border-radius:
+        10px;
+
+      margin-top:
+        20px;
+
+    }
+
+
+    .common-ledger {
+
+      margin-top:
+        20px;
+
+      padding:
+        15px;
+
+      background:
+        #fff8e6;
+
+      border-radius:
+        8px;
+
+      border:
+        1px solid
+        #f1dfaa;
+
+    }
+
+
+    .common-ledger-title {
+
+      font-weight:
+        bold;
+
+      margin-bottom:
+        10px;
+
+      color:
+        #8a6d1d;
+
+    }
+
+    .pricing-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.pricing-radio input[type="radio"] {
+  width: auto;
+  padding: 0;
+  margin: 0;
+  border: none;
+  box-shadow: none;
+  flex-shrink: 0;
+}
+
+
+    #saveButton {
+
+      width:
+        100%;
+
+      margin-top:
+        30px;
+
+      padding:
+        15px;
+
+      background:
+        #2c7be5;
+
+      color:
+        white;
+
+      font-size:
+        16px;
+
+      font-weight:
+        bold;
+
+    }
+
+
+    #saveButton:hover {
+
+      background:
+        #1a68d1;
+
+    }
+
+
+    #saveButton:disabled {
+
+      background:
+        #aaa;
+
+      cursor:
+        not-allowed;
+
+    }
+
+
+    #message {
+
+      text-align:
+        center;
+
+      margin-top:
+        15px;
+
+      font-weight:
+        bold;
+
+    }
+
+
+    .help-text {
+
+      font-size:
+        13px;
+
+      color:
+        #777;
+
+      margin-top:
+        5px;
+
+    }
+
+
+    @media
+    (
+      max-width:
+      600px
+    ) {
+
+      .ledger-row {
+
+        flex-direction:
+          column;
+
+        align-items:
+          stretch;
+
+      }
+
+
+      .ledger-row
+      input:first-child {
+
+        width:
+          100%;
+
+      }
+
+    }
+
+    
+.preview-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.preview-actions button {
+  flex: 1;
+  background: #eaf2ff;
+  color: #2878d4;
+  border: 1px solid #cbdcf5;
+  font-weight: bold;
+}
+
+.preview-actions button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.preview-results {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  box-sizing: border-box;
+}
+
+.preview-results table {
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 13px;
+}
+
+.preview-results th,
+.preview-results td {
+  padding: 8px;
+  border: 1px solid #ddd;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.preview-results table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.preview-results th,
+.preview-results td {
+  padding: 8px;
+  border: 1px solid #ddd;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.preview-results th {
+  background: #f4f6f8;
+}
+
+.preview-results .preview-message {
+  font-size: 14px;
+  color: #555;
+}
+
+
+  </style>
+
+</head>
+
+
+<body>
+
+
+  <div class="container">
+
+
+    <h2>
+      Tally Bridge Setup
+    </h2>
+
+
+    <p class="subtitle">
+      Configure your Tally company and GST ledgers
+    </p>
+
+
+    <!-- COMPANY -->
+
+    <div class="field-group">
+
+      <label>
+        Tally Company Name
+      </label>
+
+
+      <input
+        id="companyName"
+        type="text"
+        placeholder="Enter Tally Company Name"
+      >
+
+
+    </div>
+
+  
+<!-- DEFAULT PRODUCT UNIT -->
+
+<div class="field-group">
+  <label for="defaultProductUnit">
+    Default Product Unit
+  </label>
+
+  <input
+    id="defaultProductUnit"
+    type="text"
+    placeholder="Example: Nos"
+  >
+
+  <p class="help-text">
+    Used when a product's unit is missing or is a Tally default value.
+  </p>
+</div>
+
+<!-- DEFAULT CUSTOMER AREA -->
+
+<div class="field-group">
+  <label for="defaultCustomerArea">
+    Default Customer Area
+  </label>
+
+  <input
+    id="defaultCustomerArea"
+    type="text"
+    placeholder="Example: Mannarkkad"
+  >
+
+  <p class="help-text">
+    Used when a customer's group or area is missing or is a Tally default value.
+  </p>
+</div>
+
+
+  
+<!-- SALES LEDGERS -->
+<div class="field-group">
+  <label for="salesLedgers">Sales Ledgers</label>
+
+  <textarea
+    id="salesLedgers"
+    rows="4"
+    placeholder="POS Sales&#10;Online Sales&#10;Wholesale Sales"
+  ></textarea>
+
+  <p class="help-text">
+    Enter one Sales Ledger name per line.
+    All names must match the ledgers in Tally.
+  </p>
+</div>
+
+<div class="field-group">
+ 
+<!-- SALES VOUCHER TYPES -->
+<div class="field-group">
+  <label for="salesVoucherTypes">
+    Sales Voucher Types
+  </label>
+
+  <textarea
+    id="salesVoucherTypes"
+    rows="4"
+    placeholder="Sales&#10;Retail Sales&#10;Export Sales"
+  ></textarea>
+
+  <p class="help-text">
+    Enter one Sales Voucher Type per line.
+    Names must match the voucher types in Tally.
+  </p>
+</div>
+
+
+    <!-- PRODUCT PRICING SETTINGS -->
+<div class="section">
+  <h3>Product Pricing Method</h3>
+
+  <p class="help-text">
+    Choose one method to populate product selling prices.
+  </p>
+
+  <div class="field-group">
+    <label class="pricing-radio">
+      <input type="radio"
+             name="pricingMethod"
+             value="standard"
+             checked>
+      Standard selling price
+    </label>
+
+    <label class="pricing-radio">
+      <input type="radio"
+             name="pricingMethod"
+             value="opening">
+      Opening price
+    </label>
+
+    <label class="pricing-radio">
+      <input type="radio"
+             name="pricingMethod"
+             value="price_levels">
+      Price levels
+    </label>
+  </div>
+
+  <div id="priceLevelSettings" style="display:none;">
+
+    <div class="field-group">
+      <label for="highestPriceLevel">
+        Highest price level — price_c
+      </label>
+      <input id="highestPriceLevel"
+             type="text"
+             placeholder="Example: Retail">
+    </div>
+
+    <div class="field-group">
+      <label for="mediumPriceLevel">
+        Medium price level — price_b
+      </label>
+      <input id="mediumPriceLevel"
+             type="text"
+             placeholder="Example: Book Shop">
+    </div>
+
+    <div class="field-group">
+      <label for="lowestPriceLevel">
+        Lowest price level — price_a
+      </label>
+      <input id="lowestPriceLevel"
+             type="text"
+             placeholder="Example: Wholesale">
+    </div>
+
+    <div class="field-group">
+      <label for="specialPriceLevel">
+        Special price level — price_d
+      </label>
+      <input id="specialPriceLevel"
+             type="text"
+             placeholder="Example: Special">
+    </div>
+
+  </div>
+
+  <p class="help-text">
+    Price levels use the highest available rate tier and
+    apply its discount. Missing prices will not overwrite
+    existing database values.
+  </p>
+</div>
+
+    <!-- GST STATUS -->
+
+    <div class="field-group">
+
+      <label>
+        GST Status
+      </label>
+
+
+      <select
+        id="gstEnabled"
+      >
+
+        <option value="true">
+          GST Enabled
+        </option>
+
+
+        <option value="false">
+          GST Not Enabled
+        </option>
+
+
+      </select>
+
+
+    </div>
+
+
+    <!-- CGST -->
+
+    <div class="section">
+
+      <h3>
+        CGST Ledgers
+      </h3>
+
+
+      <p class="help-text">
+        Add percentage-wise CGST ledgers if required.
+      </p>
+
+
+      <div
+        id="cgstLedgers"
+      ></div>
+
+
+      <button
+        type="button"
+        id="addCgstButton"
+        class="add-button"
+      >
+
+        + Add CGST Ledger
+
+      </button>
+
+
+    </div>
+
+
+    <!-- SGST -->
+
+    <div class="section">
+
+      <h3>
+        SGST Ledgers
+      </h3>
+
+
+      <p class="help-text">
+        Add percentage-wise SGST ledgers if required.
+      </p>
+
+
+      <div
+        id="sgstLedgers"
+      ></div>
+
+
+      <button
+        type="button"
+        id="addSgstButton"
+        class="add-button"
+      >
+
+        + Add SGST Ledger
+
+      </button>
+
+
+    </div>
+
+
+    <!-- IGST -->
+
+    <div class="section">
+
+      <h3>
+        IGST Ledgers
+      </h3>
+
+
+      <p class="help-text">
+        Add percentage-wise IGST ledgers if required.
+      </p>
+
+
+      <div
+        id="igstLedgers"
+      ></div>
+
+
+      <button
+        type="button"
+        id="addIgstButton"
+        class="add-button"
+      >
+
+        + Add IGST Ledger
+
+      </button>
+
+
+    </div>
+
+
+    <!-- COMMON LEDGERS -->
+
+    <div class="section">
+
+      <h3>
+        Common GST Ledgers
+      </h3>
+
+
+      <p class="help-text">
+        Use these when your Tally uses one GST ledger for all tax rates.
+      </p>
+
+
+      <div class="common-ledger">
+
+        <div class="common-ledger-title">
+          Common CGST Ledger
+        </div>
+
+
+        
+<div class="field-group">
+  <label for="commonCgstLedgers">
+    Common CGST Ledgers
+  </label>
+
+  <textarea
+    id="commonCgstLedgers"
+    rows="3"
+    placeholder="CGST 9%&#10;CGST 6%&#10;CGST 2.5%"
+  ></textarea>
+
+  <p class="help-text">
+    Enter one CGST ledger name per line.
+  </p>
+</div>
+
+
+
+      </div>
+
+
+      <div class="common-ledger">
+
+        <div class="common-ledger-title">
+          Common SGST Ledger
+        </div>
+
+
+        
+<div class="field-group">
+  <label for="commonSgstLedgers">
+    Common SGST Ledgers
+  </label>
+
+  <textarea
+    id="commonSgstLedgers"
+    rows="3"
+    placeholder="SGST 9%&#10;SGST 6%&#10;SGST 2.5%"
+  ></textarea>
+
+  <p class="help-text">
+    Enter one SGST ledger name per line.
+  </p>
+</div>
+
+
+
+      </div>
+
+
+      <div class="common-ledger">
+
+        <div class="common-ledger-title">
+          Common IGST Ledger
+        </div>
+
+
+       
+<div class="field-group">
+  <label for="commonIgstLedgers">
+    Common IGST Ledgers
+  </label>
+
+  <textarea
+    id="commonIgstLedgers"
+    rows="3"
+    placeholder="IGST 18%&#10;IGST 12%&#10;IGST 5%"
+  ></textarea>
+
+  <p class="help-text">
+    Enter one IGST ledger name per line.
+  </p>
+</div>
+
+
+
+      </div>
+
+            <!-- ROUND OFF LEDGER -->
+
+      <div class="common-ledger">
+
+        <div class="common-ledger-title">
+          Round Off Ledger
+        </div>
+
+        <input
+          id="roundOffLedger"
+          type="text"
+          placeholder="Example: Round Off"
+        >
+
+      </div>
+
+
+    </div>
+
+
+  
+<!-- ORDER FLOW INITIAL SYNC OPTIONS -->
+
+<div class="section">
+  <h3>Order Flow Initial Sync</h3>
+
+  <p class="help-text">
+    Select which data should be imported from Tally
+    when you save the setup for the first time.
+  </p>
+
+  <label class="sync-option">
+    <input
+      type="checkbox"
+      id="syncCustomersToOrderFlow"
+    >
+    Sync Customers Details to Order Flow
+  </label>
+
+  <label class="sync-option">
+    <input
+      type="checkbox"
+      id="syncProductsToOrderFlow"
+    >
+    Sync Product Details to Order Flow
+  </label>
+</div>
+
+
+    
+<!-- TALLY DATA PREVIEW BUTTONS -->
+
+<div class="preview-actions">
+  <button type="button" id="previewProductsButton">
+    Preview 10 Products
+  </button>
+
+  <button type="button" id="previewCustomersButton">
+    Preview 10 Customers
+  </button>
+</div>
+
+<div
+  id="previewResults"
+  class="preview-results"
+  aria-live="polite"
+  style="display: none;"
+></div>
+
+
+
+    <!-- SAVE -->
+
+    <button
+      id="saveButton"
+      type="button"
+    >
+
+      Save and Start Bridge
+
+    </button>
+
+
+    <p
+      id="message"
+    ></p>
+
+
+  </div>
+
+
+  <script
+    src="setup.js"
+  ></script>
+
+
+</body>
+
+</html>

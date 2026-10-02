@@ -1,0 +1,44 @@
+{
+  "name": "tally-bridge",
+  "version": "1.0.4",
+  "description": "Tally Bridge",
+  "main": "main.js",
+  "author": "Twin Flow",
+  "license": "ISC",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.4",
+    "axios": "^1.20.0",
+    "better-sqlite3": "^12.11.1",
+    "dotenv": "^17.4.2"
+  },
+  "devDependencies": {
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.yourcompany.tallybridge",
+    "productName": "Tally Bridge",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "**/*",
+      "!release/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "tally-bridge-icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}
