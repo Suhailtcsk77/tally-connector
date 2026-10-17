@@ -181,11 +181,15 @@ const bridgeSecret =
 const tallyCompanyId =
   String(process.env.TALLY_COMPANY_ID || '').trim();
 
+
 const defaultProductUnit =
   String(process.env.DEFAULT_PRODUCT_UNIT || '').trim() || 'Nos';
 
 const defaultCustomerArea =
   String(process.env.DEFAULT_CUSTOMER_AREA || '').trim() || 'Shop';
+
+const expectedTallyCompanyName =
+  String(process.env.TALLY_COMPANY || '').trim();
 
 // TEMPORARY: fetch customer data without writing it to Supabase.
 const CUSTOMER_SYNC_PREVIEW_ONLY = false;
@@ -2212,9 +2216,11 @@ function resolveProductSyncStockGroupGstRate(
 async function syncProductsToSupabase() {
   if (!tallyCompanyId) {
     throw new Error(
-      'Company ID is missing. Check the activation and .env file.'
+      'Company ID is missing. Check your .env file.'
     );
   }
+
+  await assertActiveCompanyMatchesEnv();
 
   console.log('[PRODUCT SYNC] Fetching stock items from Tally...');
 
@@ -2670,6 +2676,8 @@ for (const item of products) {
   const productToSync = { ...fields };
 delete productToSync.closing_stock;
 
+await assertActiveCompanyMatchesEnv();
+
 const saveResult = await writeProductThroughEdgeFunction(
   productToSync,
   null
@@ -2809,26 +2817,28 @@ async function fetchCustomersFromTally() {
   }
 
   function parseCustomerBalance(value) {
-    const raw = String(value || '').trim();
+  const raw = String(value || '').trim();
 
-    const match = raw
-      .replace(/,/g, '')
-      .match(/-?\d+(?:\.\d+)?/);
+  const balanceMatch = raw
+    .replace(/,/g, '')
+    .match(/-?\d+(?:\.\d+)?/);
 
-    if (!match) return 0;
+  if (!balanceMatch) return 0;
 
-    const amount = Number(match[0]);
+  const amount = Number(balanceMatch[0]);
 
-    if (/\bCR\b/i.test(raw)) {
-      return -Math.abs(amount);
-    }
-
-    if (/\bDR\b/i.test(raw)) {
-      return Math.abs(amount);
-    }
-
-    return amount;
+  // Debit balance should be positive.
+  if (/\bDR\b/i.test(raw)) {
+    return Math.abs(amount);
   }
+
+  // Credit balance should be negative.
+  if (/\bCR\b/i.test(raw)) {
+    return -Math.abs(amount);
+  }
+
+  return -amount;
+}
 
   const customers = [];
   const ledgerRegex =
@@ -2882,9 +2892,26 @@ async function fetchCustomersFromTally() {
       ''
     ).trim();
 
-    const balance = parseCustomerBalance(
-      getTagValue(itemXml, 'CLOSINGBALANCE')
-    );
+    const rawClosingBalance =
+  getTagValue(itemXml, 'CLOSINGBALANCE');
+
+console.log(
+  '[BALANCE DEBUG]',
+  customerName,
+  'Raw Tally balance:',
+  JSON.stringify(rawClosingBalance)
+);
+
+const balance = parseCustomerBalance(rawClosingBalance);
+
+console.log(
+  '[BALANCE RESULT]',
+  customerName,
+  'Raw:',
+  rawClosingBalance,
+  'Converted:',
+  balance
+);
 
     
 const parentGroup = String(
@@ -2906,10 +2933,14 @@ const fallbackPrice = cleanCustomerText(
   process.env.PRICE_LEVEL_HIGHEST || ''
 );
 
+const normalizedPricingMethod = String(
+  pricingMethod || 'standard'
+).trim().toLowerCase().replace(/[\s-]+/g, '_');
+
 const customerPrice =
-  usablePriceLevel ||
-  fallbackPrice ||
-  'Price';
+  normalizedPricingMethod === 'price_levels'
+    ? (usablePriceLevel || fallbackPrice || 'Price')
+    : 'Price';
 
 
 const customerBeat =
@@ -3132,6 +3163,8 @@ if (CUSTOMER_SYNC_PREVIEW_ONLY) {
 
 let productSyncInProgress = false;
 let productSyncEnabled = true;
+let startupCompanyName = null;
+let productSyncBlocked = false;
 let commandBuffer = '';
 
 function sendProductSyncResult(result) {
@@ -5540,6 +5573,66 @@ function buildGSTLedgerEntries(
 
     }
 
+    async function assertActiveCompanyMatchesEnv() {
+  if (!expectedTallyCompanyName) {
+    throw new Error('TALLY_COMPANY is missing. Sync stopped.');
+  }
+
+  const xml = `
+<ENVELOPE>
+  <HEADER>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>CompanyInfo</ID>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES />
+      <TDL>
+        <TDLMESSAGE>
+          <OBJECT NAME="CurrentCompany">
+            <LOCALFORMULA>CurrentCompany:##SVCURRENTCOMPANY</LOCALFORMULA>
+          </OBJECT>
+          <COLLECTION NAME="CompanyInfo">
+            <OBJECTS>CurrentCompany</OBJECTS>
+          </COLLECTION>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
+  </BODY>
+</ENVELOPE>`;
+
+  const result = await postToTally(xml);
+
+  if (!result || result.success !== true) {
+    throw new Error('Cannot verify Tally company. Sync stopped.');
+  }
+
+  const responseXml = String(result.data || '');
+
+  const activeCompany = String(
+    getTagValue(responseXml, 'CURRENTCOMPANY') || ''
+  ).trim();
+
+  if (!activeCompany) {
+    console.error('[COMPANY CHECK] Response:', responseXml);
+    throw new Error('Tally returned no company name. Sync stopped.');
+  }
+
+  if (
+    activeCompany.toLowerCase() !==
+    expectedTallyCompanyName.toLowerCase()
+  ) {
+    throw new Error(
+      `Wrong company. Expected "${expectedTallyCompanyName}", ` +
+      `but active company is "${activeCompany}". Sync stopped.`
+    );
+  }
+
+  console.log('[COMPANY CHECK] Verified:', activeCompany);
+}
+
     // =================================
     // GET TALLY COMPANY GST STATUS
     // =================================
@@ -5746,6 +5839,10 @@ function buildGSTLedgerEntries(
         responseXml
       );
 
+      const companyName = String(
+  getTagValue(responseXml, 'TALLYBRIDGECOMPANYNAME') || ''
+).trim();
+
 
       const registrationType =
         getTagValue(
@@ -5871,17 +5968,11 @@ function buildGSTLedgerEntries(
 
 
       return {
-
-        gstEnabled:
-          gstEnabled,
-
-        registrationType:
-          registrationType,
-
-        gstin:
-          gstin
-
-      };
+  companyName,
+  gstEnabled,
+  registrationType,
+  gstin
+};
 
     }
 
@@ -6678,7 +6769,7 @@ function buildGSTLedgerEntries(
 
 
         if (
-          grossTotal <= 0
+          grossTotal < 0
         ) {
 
           throw new Error(
