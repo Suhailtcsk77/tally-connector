@@ -3462,6 +3462,12 @@ function updateMenu() {
   type: 'separator'
 },
 
+{
+  label: productSyncRunning ? 'Refreshing Products...' : 'Refresh Products',
+  enabled: activated && setupComplete && isRunning && !productSyncRunning,
+  click: requestProductSync
+},
+
 
 {
   label: productSyncEnabled

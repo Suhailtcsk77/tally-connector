@@ -1673,38 +1673,28 @@ function getLatestPriceLevelRate(
   return latestNetPrice;
 }
 
-
 function getSelectedSellingPrice(
   itemXml,
   method,
   names
 ) {
   if (method === 'standard') {
-    const standardPrice =
-      getLatestApplicableSellingRate(itemXml);
-
-    return standardPrice ?? getOpeningRate(itemXml);
+    return getLatestApplicableSellingRate(itemXml);
   }
 
   if (method === 'opening') {
-    const openingPrice = getOpeningRate(itemXml);
-
-    return openingPrice ?? getLatestApplicableSellingRate(itemXml);
+    return getOpeningRate(itemXml);
   }
 
   if (method === 'price_levels') {
-    const fallbackPrice =
-      getLatestApplicableSellingRate(itemXml) ??
-      getOpeningRate(itemXml);
-
     const getConfiguredLevelPrice = (levelName) => {
       if (!normalizeProductName(levelName)) {
         return null;
       }
 
-      return (
-        getLatestPriceLevelRate(itemXml, levelName) ??
-        fallbackPrice
+      return getLatestPriceLevelRate(
+        itemXml,
+        levelName
       );
     };
 
